@@ -1,0 +1,8 @@
+fastapi
+pydantic
+pymongo
+openai
+redis
+rq
+scikit-learn
+joblib
