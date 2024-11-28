@@ -122,7 +122,6 @@ async def get_questions(request: QuestionRequestModel, authorized: bool = Depend
                 status_code=404,
                 detail=f"No job found for ID: {request.job_Id}"
             )
-        status = status.decode("utf-8")
         if status == "completed":
             data = redis_conn.get(request.job_Id)
             if not data:
@@ -130,7 +129,7 @@ async def get_questions(request: QuestionRequestModel, authorized: bool = Depend
                     status_code=500,
                     detail=f"Job {request.job_Id} is marked as completed, but no data is available."
                 )
-            data = json.loads(data.decode("utf-8"))
+            data = json.loads(data)
             return {
                 "status": "completed",
                 "data": data
