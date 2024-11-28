@@ -5,10 +5,12 @@ import re
 import time
 import pickle,os
 from redis import Redis
+from db_manager import get_redis_connection
 
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
+redis_conn = get_redis_connection()
+if redis_conn is None:
+    print("Failed to connect redis")
+
 
 # MinHash Class
 class MinHash:

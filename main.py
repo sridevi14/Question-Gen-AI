@@ -9,24 +9,25 @@ import uuid
 import logging,json
 from rq import Queue
 from worker import process_question_generation_task
-from db_manager import get_db_connection
+from db_manager import get_mongo_connection,get_redis_connection
 
-import os
-db = get_db_connection()
+db = get_mongo_connection()
+if db is None:
+    print("Database connection failed.")
+
+redis_conn = get_redis_connection()
+if redis_conn is None:
+    print("Failed to connect to Redis.")
+
+# RQ queue
+question_queue = Queue(connection=redis_conn)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Environment variables
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 API_KEY = os.getenv("API_KEY")
-# Redis connection
-redis_conn = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0)
-
-# RQ queue
-question_queue = Queue(connection=redis_conn)
 
 app = FastAPI()
 

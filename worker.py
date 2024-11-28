@@ -7,29 +7,35 @@ from typing import List
 from redis import Redis
 from pydantic import BaseModel
 from openai import OpenAI
-from db_manager import get_db_connection
+from db_manager import get_mongo_connection,get_redis_connection
 from tfidf_minhash import MinHash,FindDuplicates
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# Environment variables
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is missing from environment variables.")
 
 # Redis and MongoDB clients
-db = get_db_connection()
-redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
+db = get_mongo_connection()
+if db is None:
+    print("Database connection failed.")
+
+redis_conn = get_redis_connection()
+if redis_conn is None:
+    print("Failed to connect to Redis.")
+
+
 # self.db["generated_questions"].create_index([("hash", ASCENDING)])
 #         self.db["generated_questions"].create_index([("metadata.technology", ASCENDING)])
 #         self.db["generated_questions"].create_index([("question.tags", ASCENDING)])
  # OpenAI client
+
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 minhash = MinHash(num_permutations=100)
+
 # Define request model
 class GenerateQuestionRequestModel(BaseModel):
     technology_name: str
