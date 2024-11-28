@@ -1,0 +1,29 @@
+version: "3.8"
+services:
+  app:
+    build:
+      context: .
+    container_name: fastapi_app
+    ports:
+      - "80:80"
+    env_file:
+      - .env
+    command: uvicorn main:app --host 0.0.0.0 --port 80
+    depends_on:
+      - redis
+
+  worker:
+    build:
+      context: .
+    container_name: rq_worker
+    env_file:
+      - .env
+    command: python worker.py
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:6.2
+    container_name: redis
+    ports:
+      - "6379:6379"
