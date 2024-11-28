@@ -2,6 +2,7 @@ import hashlib
 from sklearn.feature_extraction.text import TfidfVectorizer
 from datetime import datetime
 import re
+import time
 import pickle,os
 from redis import Redis
 
@@ -53,7 +54,7 @@ def calculate_tfidf_similarity(question1: str, question2: str) -> float:
     return cosine_similarity
 
 # Check for duplicate questions
-def is_duplicate(question, metadata, minhash: MinHash, db, hash_value,companyID):
+def is_duplicate(question, metadata, minhash: MinHash, db, hash_value):
     # Exact Match (Hash-based)
     exact_match = db["duplicate_find"].find_one({"hash": hash_value})
     if exact_match:
@@ -62,7 +63,6 @@ def is_duplicate(question, metadata, minhash: MinHash, db, hash_value,companyID)
 
     # Filter documents by technology and tags
     relevant_docs = db["duplicate_find"].find({
-        "companyID":companyID,
         "metadata.technology": metadata["technology"],
         "metadata.difficulty": metadata["difficulty"],
         "question.tags": {"$in": question["tags"]}
@@ -77,7 +77,7 @@ def is_duplicate(question, metadata, minhash: MinHash, db, hash_value,companyID)
     for existing in documents:
         # MinHash Comparison
         existing_hash = existing["hash"]
-        redis_key = f"question_signature:{companyID}:{existing_hash}"
+        redis_key = f"question_signature:{existing_hash}"
         stored_signature = redis_conn.get(redis_key)
         if stored_signature:
             existing_signature =  pickle.loads(stored_signature)
@@ -104,26 +104,31 @@ def is_duplicate(question, metadata, minhash: MinHash, db, hash_value,companyID)
         if similarity > 0.85:
             print("TF-IDF found duplicate")
             return True
-    redis_key = f"question_signature:{companyID}:{hash_value}"
+    redis_key = f"question_signature:{hash_value}"
     redis_conn.set(redis_key, pickle.dumps(question_signature))
     return False
 
 
 # Store question if not duplicate
-def store_question(question, metadata, minhash:MinHash, db,companyID):
+def FindDuplicates(question, metadata, minhash:MinHash, db,request):
     hash_value = generate_question_hash(question["question"], metadata)
-    if is_duplicate(question, metadata, minhash, db,hash_value,companyID):
+    if is_duplicate(question, metadata, minhash, db,hash_value):
         print(f"Duplicate found: {question['question']}")
-        return False
+        return False,None
+    #updating question ID
+    max_question = db["duplicate_find"].find_one(sort=[("question.id", -1)])
+    next_question_id = (max_question["question"]["id"] + 1) if max_question else 1
+    question["id"] = next_question_id
 
     question_data = {
         "question": question,
         "hash": hash_value,
         "metadata": metadata,
         "created_at": datetime.now().timestamp(),
-        "companyID":companyID
+        "generated_by": request.company_Id,
+        "strict_question":request.strict_question
     }
     db["duplicate_find"].insert_one(question_data)
     print(f"Stored question: {question['question']}")
-    return True
+    return True,question
 
