@@ -5,11 +5,11 @@ import time
 import logging
 from typing import List
 from redis import Redis
-from pymongo import MongoClient
 from pydantic import BaseModel
 from openai import OpenAI
-
+from db_manager import get_db_connection
 from tfidf_minhash import MinHash,FindDuplicates
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -17,24 +17,21 @@ logger = logging.getLogger(__name__)
 # Environment variables
 REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
-MONGO_URI = os.getenv("MONGO_URI")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 if not OPENAI_API_KEY:
     raise ValueError("OPENAI_API_KEY is missing from environment variables.")
-EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL", "text-embedding-3-small")
 
 # Redis and MongoDB clients
+db = get_db_connection()
 redis_conn = Redis(host=REDIS_HOST, port=REDIS_PORT)
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["hyreV3"]
-# self.db["duplicate_find"].create_index([("hash", ASCENDING)])
-#         self.db["duplicate_find"].create_index([("metadata.technology", ASCENDING)])
-#         self.db["duplicate_find"].create_index([("question.tags", ASCENDING)])
+# self.db["generated_questions"].create_index([("hash", ASCENDING)])
+#         self.db["generated_questions"].create_index([("metadata.technology", ASCENDING)])
+#         self.db["generated_questions"].create_index([("question.tags", ASCENDING)])
  # OpenAI client
 openai_client = OpenAI(api_key=OPENAI_API_KEY)
 minhash = MinHash(num_permutations=100)
 # Define request model
-class QuestionRequest(BaseModel):
+class GenerateQuestionRequestModel(BaseModel):
     technology_name: str
     concepts: List[str]
     difficulty_level: str
@@ -131,7 +128,7 @@ async def process_questions(structured_response, metadata, minhash, db,request):
 
     return valid_questions, duplicate_questions
 
-async def process_question_generation_task(request: QuestionRequest, job_id: str,selectedQuestions):
+async def process_question_generation_task(request: GenerateQuestionRequestModel, job_id: str,selectedQuestions):
     """
     Worker function to generate questions using OpenAI API and store results in Redis.
     """

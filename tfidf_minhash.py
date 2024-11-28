@@ -56,13 +56,13 @@ def calculate_tfidf_similarity(question1: str, question2: str) -> float:
 # Check for duplicate questions
 def is_duplicate(question, metadata, minhash: MinHash, db, hash_value):
     # Exact Match (Hash-based)
-    exact_match = db["duplicate_find"].find_one({"hash": hash_value})
+    exact_match = db["generated_questions"].find_one({"hash": hash_value})
     if exact_match:
         print("exact duplicate found")
         return True
 
     # Filter documents by technology and tags
-    relevant_docs = db["duplicate_find"].find({
+    relevant_docs = db["generated_questions"].find({
         "metadata.technology": metadata["technology"],
         "metadata.difficulty": metadata["difficulty"],
         "question.tags": {"$in": question["tags"]}
@@ -116,7 +116,7 @@ def FindDuplicates(question, metadata, minhash:MinHash, db,request):
         print(f"Duplicate found: {question['question']}")
         return False,None
     #updating question ID
-    max_question = db["duplicate_find"].find_one(sort=[("question.id", -1)])
+    max_question = db["generated_questions"].find_one(sort=[("question.id", -1)])
     next_question_id = (max_question["question"]["id"] + 1) if max_question else 1
     question["id"] = next_question_id
 
@@ -128,7 +128,7 @@ def FindDuplicates(question, metadata, minhash:MinHash, db,request):
         "generated_by": request.company_Id,
         "strict_question":request.strict_question
     }
-    db["duplicate_find"].insert_one(question_data)
+    db["generated_questions"].insert_one(question_data)
     print(f"Stored question: {question['question']}")
     return True,question
 

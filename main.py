@@ -6,16 +6,14 @@ import redis
 import os
 import time
 import uuid
-
 import logging,json
 from rq import Queue
 from worker import process_question_generation_task
-import os
-from pymongo import MongoClient
+from db_manager import get_db_connection
 
-MONGO_URI = os.getenv("MONGO_URI")
-mongo_client = MongoClient(MONGO_URI)
-db = mongo_client["hyreV3"]
+import os
+db = get_db_connection()
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -32,19 +30,19 @@ question_queue = Queue(connection=redis_conn)
 
 app = FastAPI()
 
-class QuestionRequest(BaseModel):
+class GenerateQuestionRequestModel(BaseModel):
     technology_name: str
     concepts: List[str]
     difficulty_level: str
     number_of_questions: int
     company_Id: str
     strict_question:bool
-class storeQuestionRequest(BaseModel):
+class StoreQuestionRequestModel(BaseModel):
     questions:List[int]
     company_Id:str
 
 
-class GetQuestionRequest(BaseModel):
+class QuestionRequestModel(BaseModel):
     job_Id: str
 
 
@@ -62,8 +60,8 @@ def verify_token(authorization: str = Header(None)):
 async def root():
     return {"message": "Hello World"}
 
-@app.post("/generate_Question")
-async def generate_question(request: QuestionRequest,authorized: bool = Depends(verify_token)):
+@app.post("/generate_ai_question")
+async def generate_ai_question(request: GenerateQuestionRequestModel,authorized: bool = Depends(verify_token)):
     if not request.technology_name or request.technology_name.strip() == "":
         raise HTTPException(status_code=400, detail="Technology name cannot be empty")
     if not request.difficulty_level or request.difficulty_level.strip() == "":
@@ -75,7 +73,7 @@ async def generate_question(request: QuestionRequest,authorized: bool = Depends(
 
 
     relevant_docs = list(
-    db["duplicate_find"].find({
+    db["generated_questions"].find({
         "companies_used_by": {"$nin": [request.company_Id]},
         "metadata.technology": request.technology_name,
         "metadata.difficulty": request.difficulty_level,
@@ -85,8 +83,6 @@ async def generate_question(request: QuestionRequest,authorized: bool = Depends(
     }).limit(request.number_of_questions)
 )
 
-
-    print(len(relevant_docs),request.number_of_questions)
     Questions = []
     job_id = str(uuid.uuid4())
     if len(relevant_docs) > 0:
@@ -115,8 +111,8 @@ async def generate_question(request: QuestionRequest,authorized: bool = Depends(
     return {"job_id": job_id,"status":request}
 
 
-@app.post("/getQuestions")
-async def get_questions(request: GetQuestionRequest, authorized: bool = Depends(verify_token)):
+@app.post("/get_questions")
+async def get_questions(request: QuestionRequestModel, authorized: bool = Depends(verify_token)):
     key = f"{request.job_Id}:status"
     try:
         status = redis_conn.get(key)
@@ -152,8 +148,9 @@ async def get_questions(request: GetQuestionRequest, authorized: bool = Depends(
 
 
 
-@app.post("/storeQuestion")
-async def StoreQuestion(request: storeQuestionRequest,authorized: bool = Depends(verify_token)):
+@app.post("/store_question")
+async def store_question(request: StoreQuestionRequestModel,
+                         authorized: bool = Depends(verify_token)):
       try:
         if not request.questions or len(request.questions) == 0:
             raise HTTPException(
@@ -165,7 +162,7 @@ async def StoreQuestion(request: storeQuestionRequest,authorized: bool = Depends
                 status_code=400,
                 detail="The 'company_Id' cannot be empty."
             )
-        result = db["duplicate_find"].update_many(
+        result = db["generated_questions"].update_many(
             {"question.id": {"$in": request.questions}},
             {"$addToSet": {"companies_used_by": request.company_Id}},
             upsert=False
