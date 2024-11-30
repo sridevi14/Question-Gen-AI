@@ -1,12 +1,11 @@
-import asyncio
 import os
 import json
 import time
 import logging
 from typing import List
-from redis import Redis
 from pydantic import BaseModel
 from openai import OpenAI
+
 from db_manager import get_mongo_connection,get_redis_connection
 from tfidf_minhash import MinHash,FindDuplicates
 

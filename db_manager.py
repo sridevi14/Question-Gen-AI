@@ -43,7 +43,7 @@ def get_redis_connection():
     global _redis_client
     try:
         if _redis_client is None:
-            _redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0,password=REDIS_PASSWORD,decode_responses=True)
+            _redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, db=0,password=REDIS_PASSWORD)
             _redis_client.ping()
             print("Redis connected")
         return _redis_client

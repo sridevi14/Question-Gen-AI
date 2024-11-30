@@ -7,3 +7,5 @@ rq
 scikit-learn
 joblib
 uvicorn
+python-dotenv
+

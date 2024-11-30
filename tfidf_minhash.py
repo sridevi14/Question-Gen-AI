@@ -3,13 +3,9 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from datetime import datetime
 import re
 import time
-import pickle,os
-from redis import Redis
-from db_manager import get_redis_connection
+import os
 
-redis_conn = get_redis_connection()
-if redis_conn is None:
-    print("Failed to connect redis")
+
 
 
 # MinHash Class
@@ -78,18 +74,8 @@ def is_duplicate(question, metadata, minhash: MinHash, db, hash_value):
     minhash_duplicate_found = False
     for existing in documents:
         # MinHash Comparison
-        existing_hash = existing["hash"]
-        redis_key = f"question_signature:{existing_hash}"
-        stored_signature = redis_conn.get(redis_key)
-        if stored_signature:
-            existing_signature =  pickle.loads(stored_signature)
-            print("Existing Signature found")
-        else:
-            existing_shingles = set(preprocess_question(existing["question"]["question"]).split())
-            existing_signature = minhash.get_signature(existing_shingles)
-            redis_conn.set(redis_key, pickle.dumps(existing_signature))
-            print("Signature not found in Redis")
-
+        existing_shingles = set(preprocess_question(existing["question"]["question"]).split())
+        existing_signature = minhash.get_signature(existing_shingles)
         if minhash.estimate_similarity(question_signature, existing_signature) > 0.85:
             minhash_duplicate_found = True
             break
@@ -106,8 +92,6 @@ def is_duplicate(question, metadata, minhash: MinHash, db, hash_value):
         if similarity > 0.85:
             print("TF-IDF found duplicate")
             return True
-    redis_key = f"question_signature:{hash_value}"
-    redis_conn.set(redis_key, pickle.dumps(question_signature))
     return False
 
 
@@ -130,7 +114,10 @@ def FindDuplicates(question, metadata, minhash:MinHash, db,request):
         "generated_by": request.company_Id,
         "strict_question":request.strict_question
     }
-    db["generated_questions"].insert_one(question_data)
-    print(f"Stored question: {question['question']}")
-    return True,question
-
+    try:
+        db["generated_questions"].insert_one(question_data)
+        print(f"Stored question: {question['question']}")
+        return True, question
+    except Exception as e:
+        print(f"Error storing question: {e}")
+        return False, None

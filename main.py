@@ -10,6 +10,7 @@ import logging,json
 from rq import Queue
 from worker import process_question_generation_task
 from db_manager import get_mongo_connection,get_redis_connection
+from fastapi.middleware.cors import CORSMiddleware
 
 db = get_mongo_connection()
 if db is None:
@@ -22,6 +23,8 @@ if redis_conn is None:
 # RQ queue
 question_queue = Queue(connection=redis_conn)
 
+
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -30,6 +33,14 @@ logger = logging.getLogger(__name__)
 API_KEY = os.getenv("API_KEY")
 
 app = FastAPI()
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class GenerateQuestionRequestModel(BaseModel):
     technology_name: str
@@ -122,6 +133,8 @@ async def get_questions(request: QuestionRequestModel, authorized: bool = Depend
                 status_code=404,
                 detail=f"No job found for ID: {request.job_Id}"
             )
+
+        status = status.decode("utf-8")
         if status == "completed":
             data = redis_conn.get(request.job_Id)
             if not data:
@@ -129,7 +142,7 @@ async def get_questions(request: QuestionRequestModel, authorized: bool = Depend
                     status_code=500,
                     detail=f"Job {request.job_Id} is marked as completed, but no data is available."
                 )
-            data = json.loads(data)
+            data = json.loads(data.decode("utf-8"))
             return {
                 "status": "completed",
                 "data": data
