@@ -105,14 +105,15 @@ def FindDuplicates(question, metadata, minhash:MinHash, db,request):
     max_question = db["generated_questions"].find_one(sort=[("question.id", -1)])
     next_question_id = (max_question["question"]["id"] + 1) if max_question else 1
     question["id"] = next_question_id
+    question["type"] = "objective"
 
     question_data = {
         "question": question,
         "hash": hash_value,
         "metadata": metadata,
-        "created_at": datetime.now().timestamp(),
+        "created_at": int(datetime.now().timestamp()),
         "generated_by": request.company_Id,
-        "strict_question":request.strict_question
+        "strict_question":request.strict_question,
     }
     try:
         db["generated_questions"].insert_one(question_data)

@@ -74,8 +74,10 @@ async def root():
 
 @app.post("/generate_ai_question")
 async def generate_ai_question(request: GenerateQuestionRequestModel,authorized: bool = Depends(verify_token)):
-    if not request.technology_name or request.technology_name.strip() == "":
-        raise HTTPException(status_code=400, detail="Technology name cannot be empty")
+    valid_technologies = {"React", "Golang", "Python"}
+
+    if not request.technology_name or request.technology_name.strip() not in valid_technologies:
+        raise HTTPException(status_code=400, detail="Technology name must be one of: React, Golang, Python")
     if not request.difficulty_level or request.difficulty_level.strip() == "":
         raise HTTPException(status_code=400, detail="Difficulty level cannot be empty")
     if not request.concepts:
@@ -83,7 +85,7 @@ async def generate_ai_question(request: GenerateQuestionRequestModel,authorized:
     if request.number_of_questions < 1 or request.number_of_questions > 10:
         raise HTTPException(status_code=400, detail="Number of questions must be between 1 and 10")
 
-
+    request.concepts = list({concept.strip().lower() for concept in request.concepts if concept.strip()})
     relevant_docs = list(
     db["generated_questions"].find({
         "companies_used_by": {"$nin": [request.company_Id]},
@@ -109,7 +111,7 @@ async def generate_ai_question(request: GenerateQuestionRequestModel,authorized:
                     "questions": Questions
                 }
             redis_conn.set(job_id, json.dumps(data))
-            return {"data":data,"status":request,"job_id":job_id}
+            return {"data":data,"status":"success","job_id":job_id}
         else:
             print("question found..needed_Question status queued")
             needed_Question =  request.number_of_questions - len(Questions)
@@ -120,7 +122,7 @@ async def generate_ai_question(request: GenerateQuestionRequestModel,authorized:
     redis_conn.set(f"{job_id}:status", "queued")
     question_queue.enqueue(process_question_generation_task, request, job_id, Questions)
     logger.info(f"Enqueued job with ID: {job_id}")
-    return {"job_id": job_id,"status":request}
+    return {"job_id": job_id,"status":"queued"}
 
 
 @app.post("/get_questions")
