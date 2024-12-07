@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException,Header,Depends
+from fastapi import FastAPI, HTTPException,Header,Depends,Request
 from fastapi.security import APIKeyHeader
 from pydantic import BaseModel,ValidationError
 from typing import List
@@ -72,12 +72,21 @@ def verify_token(authorization: str = Header(None)):
 async def root():
     return {"message": "Hello World"}
 
+
+@app.get("/available_technology")
+async def available_technology(request:Request,authorized: bool = Depends(verify_token)):
+    try:
+        technologies = available_tech()
+        return {"data": list(technologies), "status": "success"}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Error fetching technologies: {str(e)}")
+
 @app.post("/generate_ai_question")
 async def generate_ai_question(request: GenerateQuestionRequestModel,authorized: bool = Depends(verify_token)):
-    valid_technologies = {"React", "Golang", "Python"}
+    valid_technologies = available_tech()
 
     if not request.technology_name or request.technology_name.strip() not in valid_technologies:
-        raise HTTPException(status_code=400, detail="Technology name must be one of: React, Golang, Python")
+        raise HTTPException(status_code=400,  detail=f"Technology name must be one of: {', '.join(valid_technologies)}")
     if not request.difficulty_level or request.difficulty_level.strip() == "":
         raise HTTPException(status_code=400, detail="Difficulty level cannot be empty")
     if not request.concepts:
@@ -203,3 +212,9 @@ async def store_question(request: StoreQuestionRequestModel,
             detail=f"An unexpected error occurred: {str(e)}"
         )
 
+
+def available_tech():
+    collection = db['ai_assistants']
+    documents = collection.find()
+    valid_technologies = {doc["technology"] for doc in documents}
+    return valid_technologies

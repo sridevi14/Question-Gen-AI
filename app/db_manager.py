@@ -19,8 +19,8 @@ def get_mongo_connection():
             _client.admin.command('ping')
             print("MongoDB connected")
         return _client["hyreV3"]
-    except errors.PyMongoError:
-        print("Error: Unable to connect to MongoDB.")
+    except errors.PyMongoError as e:
+        print(f"Error: Unable to connect to MongoDB. Details: {e}")
         return None
 
 
@@ -47,6 +47,6 @@ def get_redis_connection():
             _redis_client.ping()
             print("Redis connected")
         return _redis_client
-    except redis.ConnectionError:
-        print("Error: Unable to connect to Redis.")
+    except redis.ConnectionError as e:
+        print(f"Error: Unable to connect to Redis. Details: {e}")
         return None
